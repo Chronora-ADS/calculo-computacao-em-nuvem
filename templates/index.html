@@ -7,55 +7,121 @@
     <link rel="stylesheet" href="/static/style.css" />
   </head>
   <body>
-    <h1>alculadora de Custos em Nuvem</h1>
-    <!--   on_demand_hourly (preço/hora on-demand, ex.: 0.0416)
-    ● reserved_discount_pct (desconto sobre o on-demand, ex.: 60 significa 60%)
-    ● instances_total (número total de instâncias)
-    ● hours_per_month (padrão: 730)
-    ● reserved_share_pct (0–100, fração de instâncias indo para reservadas)
-    ● reserved_upfront_monthly (opcional, amortização mensal do upfront por instância
-    reservada; padrão 0)   -->
-    <form method="post">
-      <label for="price">Preço/Hora on-demand</label>
-      <input type="number" name="on_demand_hourly" id="on_demand_hourly" placeholder="Ex.: 0.0416" />
+    <div class="main-container">
+      <!-- Painel Esquerdo: Formulário -->
+      <div class="panel form-panel">
+        <div class="panel-header">
+          <h1>Calculadora de Custos em Nuvem</h1>
+          <div class="panel-subtitle">Insira os parâmetros para calcular economias</div>
+        </div>
 
-      <label for="reserved_discoun_pct">(%) Desconto reservadas:</label>
-      <input type="number" name="reserved_discoun_pct" id="reserved_discoun_pct" placeholder="Ex.: 60%" />
+        <form method="post">
+          <div class="form-group">
+            <label for="on_demand_hourly">Preço/hora on-demand ($)</label>
+            <input type="number" step="any" id="on_demand_hourly" name="on_demand_hourly" placeholder="Ex: 0.0416" required />
+          </div>
 
-      <label for="desconto">Instâncias reservadas:</label>
-      <input type="number" name="instances_total" id="instances_total" placeholder="Ex.: 1" />
+          <div class="form-group">
+            <label for="reserved_discount_pct">Desconto em instâncias reservadas (%)</label>
+            <input type="number" id="reserved_discount_pct" name="reserved_discount_pct" placeholder="Ex: 60" value="60" required />
+          </div>
 
-      <label for="horaspormes">Horas por mês:</label>
-      <input type="number" id="hours_per_month" placeholder="730" />
+          <div class="form-group">
+            <label for="instances_total">Número total de instâncias</label>
+            <input type="number" id="instances_total" name="instances_total" placeholder="Ex: 10" required />
+          </div>
 
-      <label for="reserved_share_pct">Fração de instâncias que serão reservadas</label>
-      <select name="reserved_share_pct" id="reserved_share_pct">
-        <option value="50">50%</option>
-        <option value="80">80%</option>
-        <option value="100">100%</option>
-        <option id="other_reserved_share_pct" value="Other">Outro</option>
-      </select>
-      <input type="number" name="other_reserved_share_pct_input" id="other_reserved_share_pct_input" />
+          <div class="form-group">
+            <label for="hours_per_month">Horas por mês</label>
+            <input type="number" id="hours_per_month" name="hours_per_month" value="730" required />
+          </div>
 
-      <label for="upfrontmensal">Upfront mensal reservado:</label>
-      <input type="number" id="reserved_upfront_monthly" placeholder="0" value="0" />
+          <div class="form-group">
+            <label>Porcentagem de instâncias reservadas</label>
+            <select id="reserved_share_pct" name="reserved_share_pct">
+              <option value="50">50%</option>
+              <option value="80">80%</option>
+              <option value="100">100%</option>
+              <option value="other">Outro valor</option>
+            </select>
+            <input type="number" id="other-input" name="other-input" placeholder="Digite a porcentagem (0-100)" min="0" max="100" />
+          </div>
 
-      <button type="submit">Enviar</button>
-    </form>
-    <script>
-      const reserved_share_pct = document.getElementById('reserved_share_pct')
-      const other_reserved_share_pct_input = document.getElementById('other_reserved_share_pct_input')
-      
-      // Esconde o campo inicialmente
-      other_reserved_share_pct_input.style.display = 'none'
-      
-      reserved_share_pct.addEventListener('change', function () {
-        if (reserved_share_pct.value === 'Other') {
-          other_reserved_share_pct_input.style.display = 'block'
-        } else {
-          other_reserved_share_pct_input.style.display = 'none'
-        }
-      })
-    </script>
+          <div class="form-group">
+            <label for="reserved_upfront_monthly">Custo mensal upfront por instância reservada ($)</label>
+            <input type="number" step="any" id="reserved_upfront_monthly" name="reserved_upfront_monthly" value="0" placeholder="Ex: 10" />
+          </div>
+
+          <button type="submit">Calcular Custo</button>
+        </form>
+      </div>
+
+      <!-- Painel Direito: Histórico -->
+      <div class="panel history-panel">
+        <div class="panel-header">
+          <h2>Histórico de Cálculos</h2>
+          <div class="panel-subtitle">
+            {% if history %}
+              {{ history|length }} cálculo{% if history|length > 1 %}s{% endif %}armazenado{% if history|length > 1 %}s{% endif %}
+            {% else %}
+              Nenhum cálculo realizado ainda
+            {% endif %}
+          </div>
+        </div>
+
+        {% if history %}
+          <div class="history-grid">
+            {% for calc in history|reverse %}
+              <div class="history-card">
+                <div class="header">
+                  <span class="timestamp">Cálculo #{{ calc.timestamp }}</span>
+                  <span class="percentage">{{ calc.reserved_share_pct }}% reservadas</span>
+                </div>
+
+                <div class="results">
+                  <div class="result-row">
+                    <span>Baseline:</span>
+                    <strong>${{ '%.2f'|format(calc.baseline) }}</strong>
+                  </div>
+                  <div class="result-row">
+                    <span>Custo Total:</span>
+                    <strong>${{ '%.2f'|format(calc.cost_total) }}</strong>
+                  </div>
+                  <div class="result-row saving">
+                    <span>Economia:</span>
+                    <strong>${{ '%.2f'|format(calc.saving_abs) }} ({{ '%.1f'|format(calc.saving_pct) }}%)</strong>
+                  </div>
+                </div>
+
+                <div class="details">
+                  <div class="detail-row">
+                    <span>Instâncias:</span>
+                    <span>{{ calc.instances_total }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span>Preço/h:</span>
+                    <span>${{ calc.on_demand_hourly }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span>Desconto:</span>
+                    <span>{{ calc.reserved_discount_pct }}%</span>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-history">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="currentColor" viewBox="0 0 16 16">
+              <path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM2 2a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H2z" />
+              <path d="M2.5 4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5H3a.5.5 0 0 1-.5-.5V4zM3 7.5a.5.5 0 0 1 .5-.5h7a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-7a.5.5 0 0 1-.5-.5v-1zM3 11a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-3a.5.5 0 0 1-.5-.5v-1z" />
+            </svg>
+            <p>Seus cálculos aparecerão aqui após realizar uma consulta</p>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <script src="../static/index.js"></script>
   </body>
 </html>
